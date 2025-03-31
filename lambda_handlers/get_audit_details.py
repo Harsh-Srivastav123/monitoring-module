@@ -187,7 +187,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         variables = body.get('variables', {})
 
         if not query:
-            logger.error("No GraphQL query provided")
+            log.error("No GraphQL query provided")
             return {
                 'statusCode': HTTPStatus.BAD_REQUEST,
                 'headers': {
@@ -201,7 +201,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         result = schema.execute(query, variable_values=variables)
 
         if result.errors:
-            logger.error(f"GraphQL errors: {result.errors}")
+            log.error(f"GraphQL errors: {result.errors}")
             return {
                 'statusCode': HTTPStatus.BAD_REQUEST,
                 'headers': {
@@ -211,7 +211,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'errors': [str(error) for error in result.errors]})
             }
 
-        logger.info("GraphQL query executed successfully")
+        log.info("GraphQL query executed successfully")
         return {
             'statusCode': HTTPStatus.OK,
             'headers': {
@@ -222,7 +222,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Handler error: {str(e)}", exc_info=True)
+        log.error(f"Handler error: {str(e)}", exc_info=True)
         return {
             'statusCode': HTTPStatus.INTERNAL_SERVER_ERROR,
             'headers': {

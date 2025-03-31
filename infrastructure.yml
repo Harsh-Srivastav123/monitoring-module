@@ -140,3 +140,20 @@ functions:
           method: get
       - schedule:
           rate: cron(0 23 ? * * *) # Run every day at 11:30 PM
+
+  auditLogsCleanup:
+    handler: lambda_handlers/delete_logs.handler
+    name: audit-logs-cleanup
+    description: Deletes successful audit logs older than 48 hours from the database
+    events:
+      - schedule:
+          rate: cron(0 23 ? * * *) # Run daily at 11:30 PM
+    environment:
+      LOG_LEVEL: INFO
+    # Include appropriate IAM permissions for database access
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - secretsmanager:GetSecretValue
+        Resource: 
+          - "arn:aws:secretsmanager:*:*:secret:database_credentials-*"
