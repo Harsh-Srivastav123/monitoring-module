@@ -1,0 +1,142 @@
+# # # infrastructure.yml
+# # functions:
+# #   logsExporter:
+# #     handler: utils/log_expoter.lambda_handler
+# #     name: logs-exporter
+# #     # Make sure this matches what's referenced in log-subscriptions.yml
+    
+# #   metricsProcessor:
+# #     handler: utils/log_processor.lambda_handler
+# #     name: metrics-processor
+# #     environment:
+# #       PUSHGATEWAY_URL: ${self:provider.environment.PUSHGATEWAY_URL}
+# #     layers:
+# #       - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+
+# # resources:
+# #   - ${file(./resources/log-subscriptions.yml)}
+
+
+# service: observability-module
+
+# frameworkVersion: '3'
+
+# provider:
+#   name: aws
+#   runtime: python3.9
+#   region: ap-south-1
+#   timeout: 900
+#   environment:
+#     LOG_LEVEL: INFO
+#     # Set your Pushgateway URL - replace with your exposed endpoint
+#     PUSHGATEWAY_URL: http://13.235.39.165:9091
+#   iam:
+#     role:
+#       statements:
+#         - Effect: Allow
+#           Action:
+#             - logs:CreateLogGroup
+#             - logs:CreateLogStream
+#             - logs:PutLogEvents
+#             - logs:DescribeLogStreams
+#             - logs:FilterLogEvents
+#           Resource: 
+#             - "arn:aws:logs:*:*:*"
+
+# functions:
+  
+#   logsExporter:
+#     handler: utils/log_expoter.lambda_handler
+#     name: logs-exporter
+#     description: Exports CloudWatch logs to S3 bucket
+#     # environment:
+#     #   BUCKET_NAME: ${self:custom.logsBucket}
+#     # iamRoleStatements:
+#     #   - Effect: Allow
+#     #     Action:
+#     #       - s3:PutObject
+#     #     Resource: "arn:aws:s3:::${self:custom.logsBucket}/*"
+        
+#   # New: Log processor for metrics
+#   metricsProcessor:
+#     handler: utils/log_processor.lambda_handler
+#     description: Processes CloudWatch logs and forwards metrics to Prometheus
+#     environment:
+#       PUSHGATEWAY_URL: ${self:provider.environment.PUSHGATEWAY_URL}
+#     events:
+#       - cloudwatchLog:
+#           logGroup: '/aws/lambda/observability-handler-test'
+#           filter: '{ $.message_type = "lambda_metrics" }'
+#     layers:
+#       - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+
+
+# # custom:
+# #   logsBucket: my-logs-bucket-aws-lambda
+
+service: observability-infrastructure
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ap-south-1
+  timeout: 900
+  environment:
+    LOG_LEVEL: INFO
+    PUSHGATEWAY_URL: http://13.235.39.165:9091
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            - logs:FilterLogEvents
+          Resource: 
+            - "arn:aws:logs:*:*:*"
+
+functions:
+  logsExporter:
+    handler: utils/log_expoter.lambda_handler
+    name: logs-exporter
+    description: Exports CloudWatch logs to S3 bucket
+    events:
+      - cloudwatchLog:
+          logGroup: '/aws/lambda/observability-handler-test'
+      - cloudwatchLog:
+          logGroup: '/aws/lambda/observability-lambda-handler'
+    # environment:
+    #   BUCKET_NAME: ${self:custom.logsBucket}
+    # iamRoleStatements:
+    #   - Effect: Allow
+    #     Action:
+    #       - s3:PutObject
+    #     Resource: "arn:aws:s3:::${self:custom.logsBucket}/*"
+        
+  metricsProcessor:
+    handler: utils/log_processor.lambda_handler
+    name: metrics-processor
+    description: Processes CloudWatch logs and forwards metrics to Prometheus
+    environment:
+      PUSHGATEWAY_URL: ${self:provider.environment.PUSHGATEWAY_URL}
+    events:
+      - cloudwatchLog:
+          logGroup: '/aws/lambda/observability-handler-test'
+          filter: '{ $.message_type = "lambda_metrics" }'
+    layers:
+      - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+
+  alarmCreator:
+    handler: utils/alarm_creator.lambda_handler
+    name: alarm-creator
+    description: Creates CloudWatch alarms for Lambda functions
+    events:
+      - http:
+          path: create-alarms
+          method: get
+      - schedule:
+          rate: cron(0 23 ? * * *) # Run every day at 11:30 PM

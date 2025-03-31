@@ -1,0 +1,35 @@
+region: ap-south-1
+metrics:
+  # Existing Lambda metrics
+  - aws_namespace: AWS/Lambda
+    aws_metric_name: Invocations
+    aws_dimensions: [FunctionName]
+    range_seconds: 600
+    period_seconds: 60
+  - aws_namespace: AWS/Lambda
+    aws_metric_name: Errors
+    aws_dimensions: [FunctionName]
+    range_seconds: 600
+    period_seconds: 60
+    
+  # API Gateway metrics
+  - aws_namespace: AWS/ApiGateway
+    aws_metric_name: Count
+    aws_dimensions: [ApiName, Stage, Resource, Method]
+    range_seconds: 86400
+    period_seconds: 300
+  - aws_namespace: AWS/ApiGateway
+    aws_metric_name: Latency
+    aws_dimensions: [ApiName, Stage, Resource, Method]
+    range_seconds: 600
+    period_seconds: 60
+  - aws_namespace: AWS/ApiGateway
+    aws_metric_name: 4XXError
+    aws_dimensions: [ApiName, Stage, Resource, Method]
+    range_seconds: 600
+    period_seconds: 60
+  - aws_namespace: AWS/ApiGateway
+    aws_metric_name: 5XXError
+    aws_dimensions: [ApiName, Stage, Resource, Method]
+    range_seconds: 600
+    period_seconds: 60

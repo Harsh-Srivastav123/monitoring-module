@@ -1,0 +1,116 @@
+service: observability-module
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ap-south-1
+  timeout: 900
+  vpc:
+    securityGroupIds:
+      - sg-05138656b42b18cbb
+    subnetIds:
+      - subnet-045a759fc016943f9
+      - subnet-05b3d6048eef34639
+
+  environment:
+    LOG_LEVEL: INFO
+    # Set your Pushgateway URL - replace with your exposed endpoint
+    PUSHGATEWAY_URL: http://13.235.39.165:9091
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            - logs:FilterLogEvents
+          Resource: 
+            - "arn:aws:logs:*:*:*"
+
+functions:
+  observabilityHandler:
+    handler: lambda_handlers/test.main
+    name: observability-handler-test
+    description: Handles observability events with detailed logging
+    events:
+      - http:
+          path: /test
+          method: get
+          cors: true
+    logRetentionInDays: 14
+    layers:
+      - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:aws-sdk-core:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psycopg:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psutil:1
+
+  lambdaHandler:
+    handler: lambda_handlers/lambda.lambda_handler
+    name: observability-lambda-handler
+    description: for testing
+    events:
+      - http:
+          path: /log-testing 
+          method: post
+          cors: true
+    logRetentionInDays: 5
+    layers:
+      - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:aws-sdk-core:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psycopg:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psutil:1
+
+  auditLogsGraphQL:
+    handler: lambda_handlers/get_audit_details.handler
+    name: observability-audit-logs-graphql
+    description: GraphQL API for querying audit logs
+    events:
+      - http:
+          path: /graphql/audit-logs
+          method: post
+          cors: true
+      - http:
+          path: /graphql/audit-logs
+          method: get
+          cors: true
+    logRetentionInDays: 14
+    layers:
+      - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:aws-sdk-core:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psycopg:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:psutil:1
+      - arn:aws:lambda:ap-south-1:235298594406:layer:graphql:1
+
+
+#   logsExporter:
+#     handler: utils/log_expoter.lambda_handler
+#     name: logs-exporter
+#     description: Exports CloudWatch logs to S3 bucket
+#     # environment:
+#     #   BUCKET_NAME: ${self:custom.logsBucket}
+#     # iamRoleStatements:
+#     #   - Effect: Allow
+#     #     Action:
+#     #       - s3:PutObject
+#     #     Resource: "arn:aws:s3:::${self:custom.logsBucket}/*"
+        
+#   # New: Log processor for metrics
+#   metricsProcessor:
+#     handler: utils/log_processor.lambda_handler
+#     description: Processes CloudWatch logs and forwards metrics to Prometheus
+#     environment:
+#       PUSHGATEWAY_URL: ${self:provider.environment.PUSHGATEWAY_URL}
+#     events:
+#       - cloudwatchLog:
+#           logGroup: '/aws/lambda/observability-handler-test'
+#           filter: '{ $.message_type = "lambda_metrics" }'
+#     layers:
+#       - arn:aws:lambda:ap-south-1:235298594406:layer:powertools-requests:1
+
+
+# # custom:
+# #   logsBucket: my-logs-bucket-aws-lambda

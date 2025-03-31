@@ -1,0 +1,109 @@
+version: '3.7'
+
+services:
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.25
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - monitoring-network
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.25
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - monitoring-network
+
+  # Logstash for ingesting logs from S3 (if needed)
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.25
+    container_name: logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+    networks:
+      - monitoring-network
+
+  # NEW: Prometheus Pushgateway for Lambda metrics
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - monitoring-network
+
+  # CloudWatch Exporter (to expose CloudWatch metrics to Prometheus)
+  cloudwatch_exporter:
+    build: ./cloudwatch-exporter
+    container_name: cloudwatch_exporter
+    volumes:
+      - ./cloudwatch-exporter/config.yml:/config/config.yml
+    ports:
+      - "9106:9106"
+    networks:
+      - monitoring-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+    depends_on:
+      - cloudwatch_exporter
+      - pushgateway
+    networks:
+      - monitoring-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    environment:
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - elasticsearch
+    networks:
+      - monitoring-network
+
+volumes:
+  elasticsearch-data:
+  prometheus-data:
+
+networks:
+  monitoring-network:
+    driver: bridge
